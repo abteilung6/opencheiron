@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from core.magic import ServiceState
+
 
 # Shared properties
 class ServiceBase(BaseModel):
@@ -11,4 +13,8 @@ class ServiceCreateRequest(ServiceBase):
 
 
 class Service(ServiceBase):
-    pass
+    id: int
+    state: ServiceState
+
+    class Config:
+        orm_mode = True
