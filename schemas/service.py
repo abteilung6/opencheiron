@@ -8,12 +8,11 @@ class ServiceBase(BaseModel):
     name: str
 
 
-class ServiceCreateRequest(ServiceBase):
+class ServiceCreate(ServiceBase):
     pass
 
 
 class Service(ServiceBase):
-    id: int
     state: ServiceState
 
     class Config:

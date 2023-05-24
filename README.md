@@ -30,3 +30,11 @@ Apply the most recent migrations
 ```shell
 alembic upgrade head
 ```
+
+## Concurrent workers
+
+Spawn a celery worker
+```shell
+celery --app worker.celery worker --loglevel=info
+```
+

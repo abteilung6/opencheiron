@@ -1,1 +1,1 @@
-from .service import Service, ServiceCreateRequest
+from .service import Service, ServiceCreate

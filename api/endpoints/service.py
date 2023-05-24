@@ -1,36 +1,25 @@
-from typing import Any
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.exc import IntegrityError
+from typing import Any, List
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-import models
 import schemas
+import crud
+from api.deps import get_db
 from core.magic import ServiceState
-from db.session import SessionLocal
 from worker import create_task
 
 
 router = APIRouter()
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+@router.get("/", response_model=List[schemas.Service])
+def list_services(db: Session = Depends(get_db),) -> Any:
+    return crud.service.get_multi(db=db)
 
 
 @router.post("/", response_model=schemas.Service)
-def create_service(service_in: schemas.ServiceCreateRequest,  db: Session = Depends(get_db)) -> Any:
-    db_service = models.Service(name=service_in.name, state=ServiceState.initialized)
-    try:
-        db.add(db_service)
-        db.commit()
-        db.refresh(db_service)
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=422, detail="Service already exists")
+def create_service(service_in: schemas.ServiceCreate, db: Session = Depends(get_db)) -> Any:
+    service = crud.service.create(db=db, obj_in=schemas.Service(name=service_in.name, state=ServiceState.initialized))
+    create_task.delay(service.name)
+    return service
 
-    create_task.delay()
-    return db_service
