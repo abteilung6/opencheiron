@@ -1,11 +1,15 @@
 from typing import Dict, Any
 
-from pydantic import BaseSettings, PostgresDsn, validator
+from pydantic import BaseSettings, PostgresDsn, RedisDsn, validator
 
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "opencheiron"
 
+    # Celery
+    CELERY_BROKER_URL: RedisDsn
+
+    # SqlAlchemy
     POSTGRES_SERVER: str
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str

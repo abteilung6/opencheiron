@@ -6,7 +6,7 @@ import schemas
 import crud
 from api.deps import get_db
 from core.magic import ServiceState
-from worker import create_task
+from worker import create_service_task
 
 
 router = APIRouter()
@@ -20,6 +20,6 @@ def list_services(db: Session = Depends(get_db),) -> Any:
 @router.post("/", response_model=schemas.Service)
 def create_service(service_in: schemas.ServiceCreate, db: Session = Depends(get_db)) -> Any:
     service = crud.service.create(db=db, obj_in=schemas.Service(name=service_in.name, state=ServiceState.initialized))
-    create_task.delay(service.name)
+    create_service_task.delay(service.name)
     return service
 
