@@ -10,6 +10,8 @@ export POSTGRES_USER=postgres
 export POSTGRES_PASSWORD=postgres
 export POSTGRES_DB=postgres
 export CELERY_BROKER_URL=redis://localhost:6379/0
+export AWS_ACCESS_KEY_ID=changeme
+export AWS_SECRET_ACCESS_KEY=changeme
 ```
 
 Run the live server:
