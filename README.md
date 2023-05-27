@@ -43,3 +43,9 @@ Spawn a celery worker
 ```shell
 celery --app worker.celery worker --loglevel=info
 ```
+
+Monitor celery cluster
+
+```shell
+celery --app worker.celery flower
+```
