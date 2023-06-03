@@ -6,6 +6,17 @@ class ServiceState(enum.Enum):
     running = "running"
 
 
+class NodeState(enum.Enum):
+    """A node transitions through different states from the moment we launch it through to its termination."""
+
+    pending = "pending"
+    """The node is preparing to enter the running state. 
+    An instance enters the pending state when it is launched."""
+
+    running = "running"
+    """The node is running and ready for use."""
+
+
 class AWSInstanceType(enum.Enum):
     """Instance types are named based on their family, generation, additional capabilities, and size.
 

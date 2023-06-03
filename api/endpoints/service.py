@@ -18,8 +18,11 @@ def list_services(db: Session = Depends(get_db),) -> Any:
 
 
 @router.post("/", response_model=schemas.Service)
-def create_service(service_in: schemas.ServiceCreate, db: Session = Depends(get_db)) -> Any:
-    service = crud.service.create(db=db, obj_in=schemas.Service(name=service_in.name, state=ServiceState.initialized))
-    create_service_task.delay(service.name)
+def create_service(service_in: schemas.ServiceCreateRequest, db: Session = Depends(get_db)) -> Any:
+    service_orm = crud.service.create(
+        db=db, obj_in=schemas.ServiceCreate(
+            name=service_in.name, state=ServiceState.initialized)
+    )
+    service = schemas.Service.from_orm(service_orm)
+    create_service_task.delay(service.id)
     return service
-

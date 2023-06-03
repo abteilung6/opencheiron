@@ -8,12 +8,23 @@ class ServiceBase(BaseModel):
     name: str
 
 
-class ServiceCreate(ServiceBase):
+class ServiceCreateRequest(ServiceBase):
     pass
 
 
+class ServiceCreate(ServiceBase):
+    state: ServiceState
+
+
 class Service(ServiceBase):
+    id: int
+    name: str
     state: ServiceState
 
     class Config:
         orm_mode = True
+
+
+class ServiceConfig(BaseModel):
+    name: str
+    service_id: int
