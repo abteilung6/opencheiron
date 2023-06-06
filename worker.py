@@ -48,7 +48,7 @@ def create_service_task(service_id: int) -> bool:
         aws_credentials=aws_credentials, node_config=node_config, service_config=service_config
     )
 
-    base_service.create()
+    base_service.launch()
     session.query(Service).filter(Service.name == service.name).update(
         {"state": ServiceState.running}
     )

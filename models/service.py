@@ -7,6 +7,7 @@ from db.base_class import Base
 
 if TYPE_CHECKING:
     from .node import Node  # noqa: F401
+    from .key_pair import KeyPair  # noqa: F401
 
 
 class Service(Base):
@@ -15,3 +16,4 @@ class Service(Base):
     name = Column(String, index=True, unique=True)
     state = Column('value', Enum(ServiceState))
     nodes = relationship("Node", back_populates="owning_service")
+    key_pairs = relationship("KeyPair", back_populates="owning_service")

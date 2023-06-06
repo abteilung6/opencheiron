@@ -20,6 +20,7 @@ class BaseService:
 
     def _get_ec2_resource(self) -> Any:
         logger.info("Get EC2 resource")
+
         return boto3.resource(
             "ec2",
             aws_access_key_id=self.aws_credentials.aws_access_key_id,
@@ -27,9 +28,10 @@ class BaseService:
             region_name=self.aws_credentials.region,
         )
 
-    def create(self):
+    def launch(self):
         """Create service with node and service config."""
-        self._spawn_nodes()
+        self._create_service_key_pairs()
+        self._launch_single_node()
 
         # [SUCCESS] Service is running
         session = SessionLocal()
@@ -38,18 +40,40 @@ class BaseService:
         )
         session.commit()
 
-    def _spawn_nodes(self):
+    def _create_service_key_pairs(self) -> None:
+        """Amazon EC2 stores the public key and our service saves the private key to the database.
+        
+        The key pair name is inherited by the service name.
+        """
+        logger.info("Create EC2 key pairs")
+
+        boto_key_pair = self.ec2_resource.create_key_pair(KeyName=self.service_config.name)
+
+        session = SessionLocal()
+        crud.key_pair.create(
+            db=session, obj_in=schemas.KeyPairCreate(
+                name=self.service_config.name, 
+                key_fingerprint=boto_key_pair.key_fingerprint, 
+                key_material=boto_key_pair.key_material, 
+                service_id=self.service_config.service_id
+            )
+        )
+
+    def _launch_single_node(self):
         logger.info("Create EC2 instance")
 
         session = SessionLocal()
         node = crud.node.create(db=session, obj_in=schemas.NodeCreate(
-            state=NodeState.pending, service_id=self.service_config.service_id))
+            state=NodeState.pending, service_id=self.service_config.service_id
+            )
+        )
 
         instances = self.ec2_resource.create_instances(
             ImageId=self.node_config.image_id,
             MinCount=self.node_config.min_count,
             MaxCount=self.node_config.max_count,
             InstanceType=self.node_config.instance_type.value,
+            KeyName=self.service_config.name,
             UserData=self.node_config.user_data,
             TagSpecifications=[
                 {
