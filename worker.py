@@ -1,23 +1,13 @@
 from celery import Celery, Task
 from celery.utils.log import get_task_logger
-from core.aws import get_ec2_resource
 
 import crud
+import models
 import schemas
 from core.config import settings
-from core.magic import (
-    AWS_DEFAULT_AMI_ID,
-    AWS_SAMPLE_NODE_SCRIPT,
-    AWSInstanceType,
-    ServiceState,
-)
+from core.magic import ServiceState
 from core.services.base import BaseService
-from crud.crud_service import CRUDService
 from db.session import SessionLocal
-from models import Service
-from schemas.common import AWSCredentials
-from schemas.node import NodeConfig
-from schemas.service import ServiceConfig
 
 celery = Celery(__name__)
 celery.conf.broker_url = settings.CELERY_BROKER_URL
@@ -41,15 +31,16 @@ def create_service_task(service_id: int) -> bool:
         raise RuntimeError("Service does not exist")
 
     # create service with node and service config
-    aws_credentials = AWSCredentials.from_settings()
-    node_config = NodeConfig()
-    service_config = ServiceConfig(name=service.name, service_id=service.id)
+    aws_credentials = schemas.AWSCredentials.from_settings()
+    node_config = schemas.NodeConfig()
+    service_config = schemas.ServiceConfig(
+        name=service.name, service_id=service.id)
     base_service = BaseService(
         aws_credentials=aws_credentials, node_config=node_config, service_config=service_config
     )
 
     base_service.launch()
-    session.query(Service).filter(Service.name == service.name).update(
+    session.query(models.Service).filter(models.Service.name == service.name).update(
         {"state": ServiceState.running}
     )
     session.commit()

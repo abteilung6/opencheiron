@@ -32,8 +32,9 @@ class AWSInstanceType(enum.Enum):
 
 
 AWS_DEFAULT_REGION = "us-west-2"
-# TODO: programtically receive the suitable image id
-AWS_DEFAULT_AMI_ID = "ami-0ab193018f3e9351b"
+#  ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-20230516
+AWS_DEFAULT_AMI_ID = "ami-03f65b8614a860c29"
+AWS_DEFAULT_AMI_USERNAME = "ubuntu"
 AWS_SAMPLE_NODE_SCRIPT = """#!/bin/bash
 echo hi
 """
