@@ -6,7 +6,7 @@ import models
 import schemas
 from core.config import settings
 from core.magic import ServiceState
-from core.services.base import BaseService
+from core.services import PGService
 from db.session import SessionLocal
 
 celery = Celery(__name__)
@@ -35,13 +35,8 @@ def create_service_task(service_id: int) -> bool:
     node_config = schemas.NodeConfig()
     service_config = schemas.ServiceConfig(
         name=service.name, service_id=service.id)
-    base_service = BaseService(
+    base_service = PGService(
         aws_credentials=aws_credentials, node_config=node_config, service_config=service_config
     )
-
     base_service.launch()
-    session.query(models.Service).filter(models.Service.name == service.name).update(
-        {"state": ServiceState.running}
-    )
-    session.commit()
     return True

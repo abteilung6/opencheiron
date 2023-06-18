@@ -20,6 +20,7 @@ class Service(ServiceBase):
     id: int
     name: str
     state: ServiceState
+    public_ip_address: str | None
 
     class Config:
         orm_mode = True

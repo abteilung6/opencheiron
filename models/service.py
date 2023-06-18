@@ -17,3 +17,4 @@ class Service(Base):
     state = Column('value', Enum(ServiceState))
     nodes = relationship("Node", back_populates="owning_service")
     key_pairs = relationship("KeyPair", back_populates="owning_service")
+    public_ip_address = Column(String, nullable=True, default=None)

@@ -1,5 +1,5 @@
 from typing import TYPE_CHECKING
-from sqlalchemy import Column, ForeignKey, Integer, Enum
+from sqlalchemy import Column, ForeignKey, Integer, Enum, String
 from sqlalchemy.orm import relationship
 
 from core.magic import NodeState
@@ -16,3 +16,4 @@ class Node(Base):
     state = Column('value', Enum(NodeState))
     service_id = Column(Integer, ForeignKey("services.id"))
     owning_service = relationship("Service", back_populates="nodes")
+    public_ip_address = Column(String, nullable=True, default=None)

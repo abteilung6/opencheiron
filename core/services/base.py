@@ -1,6 +1,10 @@
 from functools import cached_property
+from io import StringIO
+import time
 import boto3
 from celery.utils.log import get_task_logger
+import paramiko
+from abc import ABC, abstractmethod
 
 from core.magic import NodeState, ServiceState
 from db.session import SessionLocal
@@ -11,7 +15,7 @@ import schemas
 logger = get_task_logger(__name__)
 
 
-class BaseService:
+class BaseService(ABC):
     def __init__(self, aws_credentials: schemas.AWSCredentials, node_config: schemas.NodeConfig, service_config: schemas.ServiceConfig) -> None:
         self.aws_credentials = aws_credentials
         self.node_config = node_config
@@ -39,17 +43,28 @@ class BaseService:
             region_name=aws_credentials.region,
         )
 
+    @abstractmethod
+    def on_ssh_connection(self, ssh_client: paramiko.SSHClient):
+        ...
+
     def launch(self):
         """Create service with node and service config."""
         self._create_service_key_pairs()
         self._create_security_group()
         self._launch_single_node()
 
+        time.sleep(10)
+        ssh_client = self._establish_ssh_connection()
+
         session = SessionLocal()
         session.query(models.Service).filter(models.Service.name == self.service_config.name).update(
-            {"state": ServiceState.running}
+            {
+                "state": ServiceState.running,
+                "public_ip_address": self.public_ip_address
+            }
         )
         session.commit()
+        self.on_ssh_connection(ssh_client)
 
     def _create_service_key_pairs(self) -> None:
         """Amazon EC2 stores the public key and our service saves the private key to the database.
@@ -100,9 +115,9 @@ class BaseService:
     def _launch_single_node(self):
         logger.info("Create EC2 instance")
         session = SessionLocal()
-        node = crud.node.create(db=session, obj_in=schemas.NodeCreate(
-            state=NodeState.pending, service_id=self.service_config.service_id
-        )
+        node = crud.node.create(
+            db=session, obj_in=schemas.NodeCreate(
+                state=NodeState.pending, service_id=self.service_config.service_id)
         )
 
         instances = self.ec2_resource.create_instances(
@@ -137,10 +152,45 @@ class BaseService:
         instance.wait_until_running()
         session = SessionLocal()
         session.query(models.Node).filter(models.Node.id == node.id).update(
-            {"state": NodeState.running}
+            {
+                "public_ip_address": self.public_ip_address,
+                "state": NodeState.running
+            }
         )
         session.commit()
         logger.info(f'EC2 instance "{instance.id}" has been started')
+
+    def _establish_ssh_connection(self):
+        logger.info(
+            "Connecting to EC2 instance via %s",
+            self.public_ip_address
+        )
+        session = SessionLocal()
+        service_key_pair = session.query(models.KeyPair).filter(
+            models.KeyPair.service_id == self.service_config.service_id
+        ).first()
+        if service_key_pair is None:
+            # TODO: handle multiple key pairs
+            raise RuntimeError(
+                f"No key pair for service id {self.service_config.service_id} found")
+
+        # Emulate file (or file-like) object in order to receive an RSA key
+        in_memory_buffer = StringIO(service_key_pair.key_material)
+        private_key = paramiko.RSAKey.from_private_key(in_memory_buffer)
+        in_memory_buffer.close()
+
+        client = paramiko.SSHClient()
+        policy = paramiko.AutoAddPolicy()
+        client.set_missing_host_key_policy(policy)
+
+        client.connect(
+            self.public_ip_address,
+            username="ubuntu", pkey=private_key
+        )
+
+        _, _stdout, _ = client.exec_command("whoami")
+        logger.info("Connected as %s", _stdout.read())
+        return client
 
     @property
     def service_name(self) -> str:
@@ -150,20 +200,54 @@ class BaseService:
     def security_group_name(self) -> str:
         return f"service-{self.service_name}"
 
-    @cached_property
+    @property
     def security_group_id(self) -> str:
+        return self._security_group_description["GroupId"]
+
+    @property
+    def default_vpc_name(self) -> str:
+        return self._vpc_description["VpcId"]
+
+    @property
+    def public_ip_address(self) -> str:
+        return self._instance_description["PublicIpAddress"]
+
+    @property
+    def public_dns_name(self) -> str:
+        return self._instance_description["PublicDnsName"]
+
+    @cached_property
+    def _instance_description(self):
+        response = self.ec2_client.describe_instances(
+            Filters=[{
+                'Name': 'tag:Name',
+                'Values': [
+                    self.service_name
+                ]
+            }]
+        )
+        logger.debug(
+            "Cache instance description for service %s",
+            self.service_name
+        )
+        return response["Reservations"][0]["Instances"][0]
+
+    @cached_property
+    def _security_group_description(self):
         response = self.ec2_client.describe_security_groups(
             Filters=[
                 dict(Name='group-name', Values=[self.security_group_name])
             ]
         )
-        _security_group_id = response['SecurityGroups'][0]['GroupId']
-        logger.debug("Cache security group id %s", _security_group_id)
-        return _security_group_id
+        logger.debug(
+            "Cache security group description for %s",
+            self.security_group_name
+        )
+        return response['SecurityGroups'][0]
 
     @cached_property
-    def default_vpc_name(self) -> str:
+    def _vpc_description(self):
+        # TODO: Use a specific VPC for service creation
         response = self.ec2_client.describe_vpcs()
-        _default_vpc_name = response.get('Vpcs', [{}])[0].get('VpcId', '')
-        logger.debug("Cache default vpc name %s", _default_vpc_name)
-        return _default_vpc_name
+        logger.debug("Cache default vpc description")
+        return response["Vpcs"][0]

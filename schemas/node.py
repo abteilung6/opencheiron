@@ -16,6 +16,7 @@ class Node(NodeBase):
     id: int
     state: NodeState
     service_id: int
+    public_ip_address: str | None
 
     class Config:
         orm_mode = True
